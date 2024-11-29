@@ -2,36 +2,34 @@ NAME = famine
 
 #########
 RM = rm -rf
-CC = cc
-CFLAGS = -Werror -Wextra -Wall -g -O3 -fsanitize=address -DDEBUG
-LDFLAGS = -lm
-RELEASE_CFLAGS = -Werror -Wextra -Wall -g -O3
+CC = nasm
+CFLAGS = -f elf64
 #########
 
 #########
-FILES = main 
+FILES = famine
 
-SRC = $(addsuffix .c, $(FILES))
+SRC = $(addsuffix .s, $(FILES))
 
-vpath %.c srcs
+vpath %.s srcs
 #########
 
 #########
 OBJ_DIR = objs
-OBJ = $(addprefix $(OBJ_DIR)/, $(SRC:.c=.o))
+OBJ = $(addprefix $(OBJ_DIR)/, $(SRC:.s=.o))
 DEP = $(addsuffix .d, $(basename $(OBJ)))
 #########
 
 #########
-$(OBJ_DIR)/%.o: %.c
+$(OBJ_DIR)/%.o: %.s
 	@mkdir -p $(@D)
-	${CC} -MMD $(CFLAGS) -c -Isrcs -Iinc $< -o $@
+	${CC}  $(CFLAGS) $< -o $@
 
 all: .gitignore
 	$(MAKE) $(NAME)
 
 $(NAME): $(OBJ) Makefile
-	$(CC) $(CFLAGS) $(OBJ) -o $(NAME) $(LDFLAGS)
+	ld $(OBJ) -o $(NAME)
 	@echo "EVERYTHING DONE  "
 #	@./.add_path.sh
 
