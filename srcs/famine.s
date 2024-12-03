@@ -30,6 +30,10 @@ _start:
 
     call getdents
 
+    xor rcx, rcx ; rcx = 0
+
+    call iterate_loop ; iterate over directory entries
+
     call hello_world  ; print "Hello, World!"
 
     call restore_stack ; exit
@@ -51,34 +55,27 @@ getdents:
     test rax, rax ; check for error
     js safe_exit ; if error, exit
 
-    mov rbx, rax ; save number of bytes read
-    call iterate_entries ; iterate over directory entries
-    ret
-
     mov qword [r15 + 350], rax ; save number of bytes read
     mov rax, SYS_CLOSE ; syscall number for sys_close
     syscall ; invoke operating system to close directory
 
     ret
 
-iterate_entries:
-    ; rsi points to the start of the buffer
-    ; rbx contains the number of bytes read
 iterate_loop:
-    test rbx, rbx
-    jz close_dir
 
-    ; Load current entry
-    mov rcx, rsi
-    add rcx, rbx
-    sub rbx, [rcx + 16] ; d_reclen (offset 16 in linux_dirent64)
+    push rcx
+    cmp byte [r15 + 418 + rcx], 8 ; check if d_type is DT_REG
+    jne .go_to_next
+    
+    call hello_world  ; print "Hello, World!"
+    .go_to_next:
+        pop rcx
+        add cx, word [rcx + r15 + 416]
+        cmp rcx, qword [r15 + 350]
+        jne iterate_loop
 
-    ; Print entry name (d_name starts at offset 19 in linux_dirent64)
-    lea rdi, [rcx + 19]
-    call print_string
-
-    ; Move to next entry
-    jmp iterate_loop
+    ;all entries done
+    call restore_stack ; exit
 
 close_dir:
     call restore_stack ; exit
