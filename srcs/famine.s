@@ -51,10 +51,45 @@ getdents:
     test rax, rax ; check for error
     js safe_exit ; if error, exit
 
+    mov rbx, rax ; save number of bytes read
+    call iterate_entries ; iterate over directory entries
+    ret
+
     mov qword [r15 + 350], rax ; save number of bytes read
     mov rax, SYS_CLOSE ; syscall number for sys_close
     syscall ; invoke operating system to close directory
 
+    ret
+
+iterate_entries:
+    ; rsi points to the start of the buffer
+    ; rbx contains the number of bytes read
+iterate_loop:
+    test rbx, rbx
+    jz close_dir
+
+    ; Load current entry
+    mov rcx, rsi
+    add rcx, rbx
+    sub rbx, [rcx + 16] ; d_reclen (offset 16 in linux_dirent64)
+
+    ; Print entry name (d_name starts at offset 19 in linux_dirent64)
+    lea rdi, [rcx + 19]
+    call print_string
+
+    ; Move to next entry
+    jmp iterate_loop
+
+close_dir:
+    call restore_stack ; exit
+    ret
+
+print_string:
+    ; Print string pointed to by rdi
+    mov rax, SYS_WRITE ; syscall number for sys_write
+    mov rdi, 1 ; file descriptor (stdout)
+    mov rdx, 256 ; max length
+    syscall
     ret
 
 
