@@ -23,7 +23,6 @@ _start:
 	push rsp
 	sub rsp, 6900 ; by substracting 6900 from rsp, we can access the 6900 bytes before the stack pointer (malloc but on stack)
 	mov r15, rsp ; r15 = malloc(6900)
-	mov byte [r15 + 69], NULL ; r15[69] = 0 (we must go somewhere to start the program)
 
     lea rdi, [rel folder1] ; rdi = "/tmp/test"
     call open_dir ; change directory to "/tmp/test"
@@ -68,6 +67,22 @@ iterate_loop:
     jne .go_to_next
     
     call hello_world  ; print "Hello, World!"
+
+    ;open file
+
+    ;read ehdr
+
+    ;check if it's an ELF file
+
+    ;iterate over sections to find PT_NOTE
+
+    ;infect
+        ;for infection i must append virus to the file, then i must
+        ;modify the entry point to point to the virus
+        ;then i must modify the virus to jump to the original entry point
+
+    ;close file
+
     .go_to_next:
         pop rcx
         add cx, word [rcx + r15 + 416]
