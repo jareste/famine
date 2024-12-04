@@ -3,7 +3,7 @@ NAME = famine
 #########
 RM = rm -rf
 CC = nasm
-CFLAGS = -f elf64
+CFLAGS = -f elf64 -g -F dwarf
 #########
 
 #########
