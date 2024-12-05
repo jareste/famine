@@ -4,6 +4,8 @@ NAME = famine
 RM = rm -rf
 CC = nasm
 CFLAGS = -f elf64 -g -F dwarf
+RELEASE_CFLAGS = -f elf64 -Ox
+LDFLAGS = #--gc-sections -s
 #########
 
 #########
@@ -29,13 +31,20 @@ all: .gitignore
 	$(MAKE) $(NAME)
 
 $(NAME): $(OBJ) Makefile
-	ld $(OBJ) -o $(NAME)
+	ld $(LDFLAGS) $(OBJ) -o $(NAME)
 	@echo "EVERYTHING DONE  "
-#	@./.add_path.sh
 
 release: CFLAGS = $(RELEASE_CFLAGS)
 release: re
+	strip --strip-all $(NAME)
+	-@upx --best --ultra-brute $(NAME) || echo "UPX compression failed or UPX not installed, continuing without compression."
 	@echo "RELEASE BUILD DONE  "
+
+debug: CFLAGS = -f elf64 -g -F dwarf
+debug: LDFLAGS =
+debug: fclean
+	$(MAKE) $(NAME)
+	@echo "DEBUG BUILD DONE  "
 
 clean:
 	$(RM) $(OBJ) $(DEP)
@@ -60,6 +69,6 @@ re: fclean
 		echo ".gitignore already exists."; \
 	fi
 
-.PHONY: all clean fclean re release .gitignore
+.PHONY: all clean fclean re release debug .gitignore
 
 -include $(DEP)
