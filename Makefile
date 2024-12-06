@@ -29,7 +29,7 @@ $(OBJ_DIR)/%.o: %.s
 
 all: .gitignore
 	$(MAKE) $(NAME)
-	sh create_test.sh
+	sh crtest.sh
 
 $(NAME): $(OBJ) Makefile
 	ld $(LDFLAGS) $(OBJ) -o $(NAME)
