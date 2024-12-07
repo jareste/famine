@@ -49,31 +49,31 @@ ft_strncmp:
     ret
 
 split_and_print:
-    mov rdi, rsi                 ; Pointer to the string
-    mov rsi, rdi                 ; Preserve the original pointer
+    mov rdi, rsi
+    mov rsi, rdi
 .split_loop:
     mov al, [rsi]
-    test al, al                  ; Check if end of string
+    test al, al
     je .done
-    cmp al, ','                  ; Check if comma
+    cmp al, ','
     je .print_word
     inc rsi
     jmp .split_loop
 
 .print_word:
-    mov byte [rsi], 0            ; Replace comma with null terminator
+    mov byte [rsi], 0
     mov r13, rsi
-    call print_string            ; Print the word
-    call print_newline           ; Print a newline
+    call print_string
+    call print_newline
 .debug:    
     mov rsi, r13 
-    inc rsi                      ; Move to the next character
-    mov rdi, rsi                 ; Update rdi to the new start of the string
+    inc rsi
+    mov rdi, rsi
     jmp .split_loop
 
 .done:
-    call print_string            ; Print the last word
-    call print_newline           ; Print a newline
+    call print_string
+    call print_newline
     ret
 
 print_string:
