@@ -34,7 +34,7 @@ _start:
     jmp .find_famine
 
 .print_famine_value:
-    call print_string
+    call split_and_print
     jmp .exit
 
 .exit:
@@ -48,7 +48,36 @@ ft_strncmp:
     mov rax, rcx
     ret
 
+split_and_print:
+    mov rdi, rsi                 ; Pointer to the string
+    mov rsi, rdi                 ; Preserve the original pointer
+.split_loop:
+    mov al, [rsi]
+    test al, al                  ; Check if end of string
+    je .done
+    cmp al, ','                  ; Check if comma
+    je .print_word
+    inc rsi
+    jmp .split_loop
+
+.print_word:
+    mov byte [rsi], 0            ; Replace comma with null terminator
+    mov r13, rsi
+    call print_string            ; Print the word
+    call print_newline           ; Print a newline
+.debug:    
+    mov rsi, r13 
+    inc rsi                      ; Move to the next character
+    mov rdi, rsi                 ; Update rdi to the new start of the string
+    jmp .split_loop
+
+.done:
+    call print_string            ; Print the last word
+    call print_newline           ; Print a newline
+    ret
+
 print_string:
+    mov rsi, rdi
     call strlen
     mov rdi, 1
     mov rdx, rax
