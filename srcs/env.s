@@ -6,22 +6,25 @@ section .text
 global _start
 
 _start:
-    mov rbx, rsp
-    mov rax, [rbx]
-    add rbx, 8
+    mov r12, rsp
+    add r12, 8
+    ; mov rbx, rsp
+    ; mov rax, [rbx]
+    ; add rbx, 8
 
 .skip_argv:
-    mov rax, [rbx]
+    ; mov rax, [rbx]
+    mov rax, [r12]
     test rax, rax
     je .after_argv
-    add rbx, 8
+    add r12, 8
     jmp .skip_argv
 
 .after_argv:
-    add rbx, 8
+    add r12, 8
 
 .find_famine:
-    mov rsi, [rbx]
+    mov rsi, [r12]
     test rsi, rsi
     je .exit
 
@@ -30,7 +33,7 @@ _start:
     test rax, rax
     je .print_famine_value
 
-    add rbx, 8
+    add r12, 8
     jmp .find_famine
 
 .print_famine_value:

