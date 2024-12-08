@@ -68,6 +68,9 @@ fclean: clean
 re: fclean
 	$(MAKE) all CFLAGS="$(CFLAGS)"
 
+test: release
+	sh test.sh
+
 .gitignore:
 	@if [ ! -f .gitignore ]; then \
 		echo ".gitignore not found, creating it..."; \
