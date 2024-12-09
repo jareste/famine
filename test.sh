@@ -5,8 +5,10 @@ RED='\033[0;31m'
 NC='\033[0m'
 
 sh crtest.sh
-make release
+
 ./Famine
+
+sleep 4
 
 cp /tmp/test/ls .
 
@@ -14,8 +16,7 @@ sh crtest.sh
 
 ./ls
 
-sleep 2
-
+sleep 4
 
 echo "\n################## TEST 1 ##################\n"
 
