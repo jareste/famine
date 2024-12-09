@@ -6,14 +6,21 @@ NC='\033[0m'
 
 sh crtest.sh
 
+echo "Launching Famine\n"
+
 ./Famine
 
 sleep 4
 
+echo "Copying infected ls\n"
+
 cp /tmp/test/ls .
+
+echo "Building scenario again. \n"
 
 sh crtest.sh
 
+echo "Launching infected ls\n"
 ./ls
 
 sleep 4
